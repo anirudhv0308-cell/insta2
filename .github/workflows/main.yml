@@ -1,0 +1,84 @@
+name: Build Instagram Focus APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "*.zip"
+      - ".github/workflows/main.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Extract Android project ZIP
+        shell: bash
+        run: |
+          set -e
+
+          ARCHIVE=$(find "$GITHUB_WORKSPACE" \
+            -maxdepth 1 -type f -iname "*.zip" \
+            -print -quit)
+
+          if [ -z "$ARCHIVE" ]; then
+            echo "No ZIP archive found in the repository root."
+            exit 1
+          fi
+
+          mkdir -p extracted
+          unzip -q "$ARCHIVE" -d extracted
+
+          SETTINGS=$(find extracted -type f \
+            \( -name settings.gradle -o \
+               -name settings.gradle.kts \) \
+            -print -quit)
+
+          if [ -z "$SETTINGS" ]; then
+            echo "Could not find settings.gradle in the ZIP."
+            echo "Check that the ZIP contains the Android project."
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$(dirname "$SETTINGS")" \
+            >> "$GITHUB_ENV"
+
+          echo "Found project at: $(dirname "$SETTINGS")"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -e
+          cd "$PROJECT_DIR"
+
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug
+          else
+            gradle_version="8.7"
+            curl -fsSL \
+              "https://services.gradle.org/distributions/gradle-${gradle_version}-bin.zip" \
+              -o /tmp/gradle.zip
+            unzip -q /tmp/gradle.zip -d /tmp
+            /tmp/gradle-${gradle_version}/bin/gradle assembleDebug
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: InstagramFocus-Debug-APK
+          path: |
+            ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
