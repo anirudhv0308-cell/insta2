@@ -1,46 +1,64 @@
-name: Diagnose Instagram Focus Gradle
-
+name: Build Instagram Focus APK
 on:
   workflow_dispatch:
-
+  push:
+    paths:
+      - "*.zip"
+      - ".github/workflows/**"
 jobs:
-  diagnose:
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Extract project ZIP
         shell: bash
         run: |
           set -e
           ARCHIVE=$(find . -maxdepth 1 -type f -iname "*.zip" -print -quit)
-          test -n "$ARCHIVE" || {
-            echo "No ZIP found in repository root"
+          if [ -z "$ARCHIVE" ]; then
+            echo "ERROR: No ZIP file found in the repository root."
             exit 1
-          }
-
-          mkdir extracted
+          fi
+          mkdir -p extracted
           unzip -q "$ARCHIVE" -d extracted
-
-      - name: Print Gradle configuration
+          echo "Project files found:"
+          find extracted -maxdepth 3 -type f | head -100
+      - name: Build debug APK
         shell: bash
         run: |
-          echo "=== Gradle wrapper ==="
-          find extracted -name gradle-wrapper.properties \
-            -exec sh -c 'echo "--- $1"; cat "$1"' _ {} \;
-
-          echo "=== Root Gradle build files ==="
-          find extracted -maxdepth 3 -type f \
-            \( -name build.gradle -o -name build.gradle.kts \) \
-            -print
-
-          find extracted -maxdepth 3 -type f \
-            \( -name build.gradle -o -name build.gradle.kts \) \
-            -exec sh -c 'echo "--- $1"; sed -n "1,180p" "$1"' _ {} \;
-
-          echo "=== Settings files ==="
-          find extracted -maxdepth 3 -type f \
-            \( -name settings.gradle -o -name settings.gradle.kts \) \
-            -exec sh -c 'echo "--- $1"; sed -n "1,160p" "$1"' _ {} \;
+          set -e
+          cd extracted
+          if [ ! -f settings.gradle ] && [ ! -f settings.gradle.kts ]; then
+            echo "ERROR: settings.gradle was not found."
+            echo "The ZIP may contain an extra enclosing folder."
+            exit 1
+          fi
+          gradle --no-daemon assembleDebug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Instagram-Focus-APK
+          path: extracted/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+### After saving it
+1. Open the **Actions** tab in GitHub.
+2. Select **Build Instagram Focus APK**.
+3. Tap **Run workflow**.
+4. Open the latest run and wait for it to finish.
+5. If successful, open **Artifacts** and download **Instagram-Focus-APK**.
+**Important:** This workflow assumes `settings.gradle` is directly inside the extracted ZIP directory. Your screenshot shows `extracted/settings.gradle`, so that matches what we need.
+If it fails again, send me a screenshot of the **first red error in the “Build debug APK” step**. That error will tell us what needs correcting next.
