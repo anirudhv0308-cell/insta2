@@ -21,17 +21,21 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Extract Android project ZIP
+      - name: Download Gradle directly
+        run: |
+          curl -fL \
+            https://services.gradle.org/distributions/gradle-8.7-bin.zip \
+            -o /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+
+      - name: Extract Android project
         shell: bash
         run: |
           set -e
-
-          ARCHIVE=$(find "$GITHUB_WORKSPACE" \
-            -maxdepth 1 -type f -iname "*.zip" \
-            -print -quit)
+          ARCHIVE=$(find . -maxdepth 1 -type f -iname "*.zip" -print -quit)
 
           if [ -z "$ARCHIVE" ]; then
-            echo "No ZIP archive found in the repository root."
+            echo "ERROR: No project ZIP found in repository root."
             exit 1
           fi
 
@@ -39,41 +43,26 @@ jobs:
           unzip -q "$ARCHIVE" -d extracted
 
           SETTINGS=$(find extracted -type f \
-            \( -name settings.gradle -o \
-               -name settings.gradle.kts \) \
+            \( -name settings.gradle -o -name settings.gradle.kts \) \
             -print -quit)
 
           if [ -z "$SETTINGS" ]; then
-            echo "Could not find settings.gradle in the ZIP."
-            echo "Check that the ZIP contains the Android project."
+            echo "ERROR: Android settings.gradle not found in ZIP."
             exit 1
           fi
 
-          echo "PROJECT_DIR=$(dirname "$SETTINGS")" \
-            >> "$GITHUB_ENV"
+          echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
+          echo "Project found: $(dirname "$SETTINGS")"
 
-          echo "Found project at: $(dirname "$SETTINGS")"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build debug APK
+      - name: Build debug APK without wrapper
         shell: bash
         run: |
           set -e
           cd "$PROJECT_DIR"
 
-          if [ -f ./gradlew ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleDebug
-          else
-            gradle_version="8.7"
-            curl -fsSL \
-              "https://services.gradle.org/distributions/gradle-${gradle_version}-bin.zip" \
-              -o /tmp/gradle.zip
-            unzip -q /tmp/gradle.zip -d /tmp
-            /tmp/gradle-${gradle_version}/bin/gradle assembleDebug
-          fi
+          /tmp/gradle-8.7/bin/gradle \
+            --no-daemon \
+            assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
