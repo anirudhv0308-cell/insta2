@@ -60,7 +60,7 @@ jobs:
           set -e
           cd "$PROJECT_DIR"
 
-          /tmp/gradle-8.7/bin/gradle \
+          /tmp/gradle-8.9/bin/gradle \
             --no-daemon \
             assembleDebug
 
