@@ -23,17 +23,19 @@ jobs:
           gradle-version: "8.9"
 
       - name: Install Android SDK
-  uses: android-actions/setup-android@v3
-  with:
-    packages: |
-      platforms;android-35
-      build-tools;35.0.0
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platforms;android-35
+            build-tools;35.0.0
 
       - name: Extract project archive
         shell: bash
         run: |
           set -e
           mkdir -p extracted
+
+     
 
           ARCHIVE=$(find . -maxdepth 1 -type f -iname "*.zip" -print -quit)
 
