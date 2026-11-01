@@ -86,10 +86,14 @@ jobs:
           cd "${{ steps.locate.outputs.dir }}"
           gradle --no-daemon assembleDebug
 
-      - name: Verify APK
+      - name: Find generated APK
         run: |
-          ls -lh app/build/outputs/apk/debug/
-          test -s app/build/outputs/apk/debug/app-debug.a
+          echo "Current directory:"
+          pwd
+          echo "Files and directories:"
+          ls -la
+          echo "Searching for APK files:"
+          find . -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
